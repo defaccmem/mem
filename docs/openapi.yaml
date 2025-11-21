@@ -1,0 +1,70 @@
+openapi: "3.0.0"
+info:
+  version: "1"
+  title: ""
+  description: ""
+paths:
+  /v1/conv:
+    post:
+      operationId: "conv_create"
+      description: ""
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/conv_create_request"
+      responses:
+        200:
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/conv_create_response"
+components:
+  securitySchemes: {}
+  schemas:
+    conv_create_request:
+      properties: {}
+    conv_create_response:
+      properties:
+        id:
+          nullable: true
+          type: "string"
+        created_at:
+          nullable: true
+          type: "integer"
+    conv:
+      properties:
+        id:
+          nullable: true
+          type: "string"
+        created_at:
+          nullable: true
+          type: "string"
+        messages:
+          nullable: true
+          type: "array"
+          items:
+            $ref: "#/components/schemas/message"
+        topic:
+          nullable: true
+          type: "string"
+    message:
+      properties:
+        role:
+          nullable: false
+          type: "string"
+        content:
+          nullable: false
+          type: "array"
+          items:
+            $ref: "#/components/schemas/content"
+    content:
+      properties:
+        type:
+          nullable: false
+          type: "string"
+        text:
+          nullable: true
+          type: "string"
