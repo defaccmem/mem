@@ -1,13 +1,13 @@
 openapi: "3.0.0"
 info:
-  version: "1"
-  title: ""
-  description: ""
+  version: "0.1.0"
+  title: "Mem"
+  description: "Memory-aware conversation API for AI assistants"
 paths:
   /v1/conv:
     post:
       operationId: "conv_create"
-      description: ""
+      description: "Start a new, empty conversation."
       parameters: []
       requestBody:
         content:
@@ -21,6 +21,39 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/conv_create_response"
+  /v1/conv/{conv_id}:
+    delete:
+      operationId: "conv_delete"
+      description: "Delete a conversation by id."
+      parameters:
+        - in: "path"
+          name: "conv_id"
+          required: true
+          schema:
+            type: "string"
+      responses:
+        200:
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: "string"
+    get:
+      operationId: "conv_retrieve"
+      description: "Retrieve a conversation by id."
+      parameters:
+        - in: "path"
+          name: "conv_id"
+          required: true
+          schema:
+            type: "string"
+      responses:
+        200:
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/conv"
 components:
   securitySchemes: {}
   schemas:
@@ -34,6 +67,7 @@ components:
         created_at:
           nullable: true
           type: "integer"
+    
     conv:
       properties:
         id:
@@ -65,6 +99,8 @@ components:
         type:
           nullable: false
           type: "string"
+          enum:
+            - "text"
         text:
           nullable: true
           type: "string"
