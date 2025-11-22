@@ -13,7 +13,7 @@ class Content(BaseModel):
 
 class Message(BaseModel):
     message_id: str
-    role: str
+    role: Literal['user', 'assistant', 'system']
     content: list[Content]
 
 class ClientInterface(ABC):

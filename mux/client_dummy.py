@@ -2,10 +2,16 @@ from sqlite3 import connect
 from typing import Self
 from client_interface import ClientInterface, Content, Conversation, Message
 import uuid
+from openai import AsyncOpenAI
+from openai.types.chat import ChatCompletionMessageParam, ChatCompletionContentPartParam
 
 class DummyClient(ClientInterface):
     def __init__(self):
         self.conn = None
+        self.client = AsyncOpenAI(
+            api_key="dummy-key",
+            base_url="http://dummy_litellm:4000/v1",
+        )
 
     async def __aenter__(self) -> Self:
         self.conn = connect('conversations.db')
@@ -86,6 +92,39 @@ class DummyClient(ClientInterface):
         
         return messages
     
+    async def _complete(self, messages: list[Message]) -> list[Content]:
+        oai_messages:list[ChatCompletionMessageParam] = []
+        for msg in messages:
+            match msg.role:
+                case "system":
+                    oai_messages.append(
+                        {
+                            "role": msg.role,
+                            "content": [{"type": c.type, "text": c.text} for c in msg.content]
+                        }
+                    )
+                case "user":
+                    oai_messages.append(
+                        {
+                            "role": msg.role,
+                            "content": [{"type": c.type, "text": c.text} for c in msg.content]
+                        }
+                    
+                    )
+                case "assistant":
+                    oai_messages.append({
+                        "role": msg.role,
+                        "content": [{"type": c.type, "text": c.text} for c in msg.content]
+                    })
+        response = await self.client.chat.completions.create(
+            model="dummy-model",
+            messages=oai_messages
+        )
+
+        if not isinstance(response.choices[0].message.content, str):
+            raise Exception("Unsupported content type in response.")
+        return [Content(type="text", text=response.choices[0].message.content)]
+
     async def post_user_message(self, conv_id: str, content: list[Content]) -> bool:
         if not self.conn:
             raise Exception("Database connection is not established.")
@@ -99,12 +138,26 @@ class DummyClient(ClientInterface):
         if not conv_row:
             return False
 
-        messages = await self._get_messages(conv_id)
-
-        text_content = content[0].text
         cursor.execute(
             "INSERT INTO dummy_messages (conv_id, message_id, role, content) VALUES (?, ?, ?, ?)",
-            (conv_id, message_id, "user", text_content)
+            (conv_id, message_id, "user", content[0].text)
         )
+
+        messages = await self._get_messages(conv_id)
+        response = await self._complete(
+            messages + [
+                Message(
+                    message_id=message_id,
+                    role="user",
+                    content=content
+                )
+            ]
+        )
+
+        cursor.execute(
+            "INSERT INTO dummy_messages (conv_id, message_id, role, content) VALUES (?, ?, ?, ?)",
+            (conv_id, str(uuid.uuid4()), "assistant", response[0].text)
+        )
+
         self.conn.commit()
         return True
