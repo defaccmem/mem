@@ -1,67 +1,36 @@
 from fastapi import FastAPI
 from sqlite3 import connect
 from client_dummy import DummyClient
-import uuid
+from client_interface import ClientInterface
 
 def db_connect():
     conn = connect('conversations.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS conversations (
-            conv_id TEXT PRIMARY KEY,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            topic TEXT
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS messages (
-            conv_id TEXT PRIMARY KEY,
-            message_id TEXT,
-            role TEXT,
-            content TEXT
-        )
-    ''')
-    conn.commit()
     return conn
-
-def get_client():
-    return DummyClient()
-
 
 app = FastAPI()
 
+def get_client() -> ClientInterface:
+    return DummyClient()
+
 @app.get('/api/conv')
 async def list_conversations():
-    with db_connect() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT conv_id, created_at, topic FROM conversations")
-        conversations = [{"id": row[0], "created_at": row[1], "topic": row[2]} for row in cursor.fetchall()]
+    async with get_client() as client:
+        conversations = await client.list_conversations()
     return {"conversations": conversations}, 200
 
 @app.post('/api/conv')
 async def create_conversation():
-    conv_id = await get_client().create_conversation()
-    with db_connect() as conn:
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO conversations (conv_id, topic) VALUES (?, ?)", (conv_id, ""))
-        conn.commit()
+    async with get_client() as client:
+        conv_id = await client.create_conversation()
     return {"id": conv_id}, 201
 
 @app.delete('/api/conv/{conv_id}')
 async def delete_conversation(conv_id):
-    client_deleted = await get_client().delete_conversation(conv_id)
-    with db_connect() as conn:
-        cursor = conn.cursor()
-        response = cursor.execute("DELETE FROM conversations WHERE conv_id = ?", (conv_id,))
-        conn.commit()
-        db_deleted = response.rowcount != 0
-
-        if client_deleted and db_deleted:
+    async with get_client() as client:
+        if await client.delete_conversation(conv_id):
             return {"status": f"Conversation deleted: {conv_id}"}, 200
-        elif not client_deleted and not db_deleted:
-            return {"error": "Conversation not found"}, 404
         else:
-            return {"error": "Failed to delete conversation completely"}, 500
+            return {"error": "Conversation not found"}, 404
 
 if __name__ == "__main__":
     import uvicorn
