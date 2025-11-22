@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from sqlite3 import connect
+from client_dummy import DummyClient
 import uuid
 
 def db_connect():
@@ -23,6 +24,9 @@ def db_connect():
     conn.commit()
     return conn
 
+def get_client():
+    return DummyClient()
+
 
 app = FastAPI()
 
@@ -36,22 +40,28 @@ async def list_conversations():
 
 @app.post('/api/conv')
 async def create_conversation():
-    conv_id = str(uuid.uuid4())
+    conv_id = await get_client().create_conversation()
     with db_connect() as conn:
         cursor = conn.cursor()
         cursor.execute("INSERT INTO conversations (conv_id, topic) VALUES (?, ?)", (conv_id, ""))
         conn.commit()
     return {"id": conv_id}, 201
 
-@app.delete('/v1/conv/{conv_id}')
+@app.delete('/api/conv/{conv_id}')
 async def delete_conversation(conv_id):
+    client_deleted = await get_client().delete_conversation(conv_id)
     with db_connect() as conn:
         cursor = conn.cursor()
         response = cursor.execute("DELETE FROM conversations WHERE conv_id = ?", (conv_id,))
         conn.commit()
-        if response.rowcount == 0:
+        db_deleted = response.rowcount != 0
+
+        if client_deleted and db_deleted:
+            return {"status": f"Conversation deleted: {conv_id}"}, 200
+        elif not client_deleted and not db_deleted:
             return {"error": "Conversation not found"}, 404
-    return {"status": f"Conversation deleted: {conv_id}"}, 200
+        else:
+            return {"error": "Failed to delete conversation completely"}, 500
 
 if __name__ == "__main__":
     import uvicorn
