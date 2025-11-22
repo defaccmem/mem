@@ -5,18 +5,25 @@ services:
       dockerfile: Dockerfile
     ports:
       - "5000:5000"
-  dummy_litellm:
-    image: ghcr.io/berriai/litellm:main-latest
-    command:
-      - "--config"
-      - "/app/config.yaml"
-    configs:
-      - source: dummy_litellm_config
-        target: /app/config.yaml
-    environment:
-      - LITELLM_MODEL=dummy
+  # dummy_litellm:
+  #   image: ghcr.io/berriai/litellm:main-latest
+  #   command:
+  #     - "--config"
+  #     - "/app/config.yaml"
+  #   configs:
+  #     - source: dummy_litellm_config
+  #       target: /app/config.yaml
+  #   environment:
+  #     - LITELLM_MODEL=dummy
+  #   ports:
+  #     - "4000:4000"
+  letta:
+    build:
+      context: ./letta
+      dockerfile: Dockerfile
+    env_file: .env
     ports:
-      - "4000:4000"
+     - "8283:8283"
 configs:
   dummy_litellm_config:
     file: ./dummy_litellm_config.yaml
