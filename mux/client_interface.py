@@ -1,11 +1,20 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Self
+from typing import Literal, Optional, Self
 from pydantic import BaseModel
 
 class Conversation(BaseModel):
     id: str
     created_at: str
     topic: Optional[str] = None
+
+class Content(BaseModel):
+    type: Literal["text"]
+    text: str
+
+class Message(BaseModel):
+    message_id: str
+    role: str
+    content: list[Content]
 
 class ClientInterface(ABC):
     @abstractmethod
@@ -26,4 +35,8 @@ class ClientInterface(ABC):
 
     @abstractmethod
     async def list_conversations(self) -> list[Conversation]:
+        ...
+
+    @abstractmethod
+    async def get_messages(self, conv_id: str) -> tuple[Conversation, list[Message]]:
         ...

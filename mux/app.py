@@ -13,24 +13,35 @@ def get_client() -> ClientInterface:
     return DummyClient()
 
 @app.get('/api/conv')
-async def list_conversations():
+async def conv_list():
     async with get_client() as client:
         conversations = await client.list_conversations()
     return {"conversations": conversations}, 200
 
 @app.post('/api/conv')
-async def create_conversation():
+async def conv_create():
     async with get_client() as client:
         conv_id = await client.create_conversation()
     return {"id": conv_id}, 201
 
 @app.delete('/api/conv/{conv_id}')
-async def delete_conversation(conv_id):
+async def conv_delete(conv_id):
     async with get_client() as client:
         if await client.delete_conversation(conv_id):
             return {"status": f"Conversation deleted: {conv_id}"}, 200
         else:
             return {"error": "Conversation not found"}, 404
+
+@app.get('/api/conv/{conv_id}')
+async def conv_retrieve(conv_id):
+    async with get_client() as client:
+        conversation, messages = await client.get_messages(conv_id)
+    return {
+        "id": conversation.id,
+        "created_at": conversation.created_at,
+        "topic": conversation.topic,
+        "messages": messages
+    }, 200
 
 if __name__ == "__main__":
     import uvicorn

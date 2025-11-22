@@ -57,3 +57,24 @@ class DummyClient(ClientInterface):
         return [
             Conversation(id=row[0], created_at=row[1], topic=row[2]) for row in cursor.fetchall()
         ]
+
+    async def get_messages(self, conv_id: str) -> tuple[Conversation, list]:
+        if not self.conn:
+            raise Exception("Database connection is not established.")
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT conv_id, created_at, topic FROM dummy_conversations WHERE conv_id = ?", (conv_id,))
+        conv_row = cursor.fetchone()
+        if not conv_row:
+            raise Exception("Conversation not found.")
+        conversation = Conversation(id=conv_row[0], created_at=conv_row[1], topic=conv_row[2])
+        
+        cursor.execute("SELECT message_id, role, content FROM dummy_messages WHERE conv_id = ?", (conv_id,))
+        messages = [
+            {
+                "message_id": row[0],
+                "role": row[1],
+                "content": [{"type": "text", "text": row[2]}]
+            } for row in cursor.fetchall()
+        ]
+        
+        return conversation, messages

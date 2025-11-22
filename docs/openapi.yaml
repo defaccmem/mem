@@ -102,14 +102,14 @@ components:
         created_at:
           nullable: true
           type: "string"
+        topic:
+          nullable: true
+          type: "string"
         messages:
           nullable: true
           type: "array"
           items:
             $ref: "#/components/schemas/message"
-        topic:
-          nullable: true
-          type: "string"
     message:
       properties:
         id:
