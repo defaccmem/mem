@@ -1,5 +1,5 @@
 from sqlite3 import connect
-from typing import Self
+from typing import Optional, Self
 from client_interface import ClientInterface, Content, Conversation, Message
 import uuid
 from openai import AsyncOpenAI
@@ -96,7 +96,7 @@ class DummyClient(ClientInterface):
         
         return messages
     
-    async def _complete(self, messages: list[Message]) -> list[Content]:
+    async def _complete(self, messages: list[Message]) -> tuple[str, list[Content]]:
         oai_messages:list[ChatCompletionMessageParam] = []
         for msg in messages:
             match msg.role:
@@ -127,9 +127,9 @@ class DummyClient(ClientInterface):
 
         if not isinstance(response.choices[0].message.content, str):
             raise Exception("Unsupported content type in response.")
-        return [Content(type="text", text=response.choices[0].message.content)]
+        return response.id, [Content(type="text", text=response.choices[0].message.content)]
 
-    async def post_user_message(self, conv_id: str, message_id: str, content: list[Content]) -> bool:
+    async def post_user_message(self, conv_id: str, content: list[Content]) -> Optional[tuple[str, str]]:
         if not self.conn:
             raise Exception("Database connection is not established.")
         if len(content) != 1:
@@ -139,8 +139,9 @@ class DummyClient(ClientInterface):
         cursor.execute("SELECT conv_id FROM dummy_conversations WHERE conv_id = ?", (conv_id,))
         conv_row = cursor.fetchone()
         if not conv_row:
-            return False
+            return None
 
+        message_id = str(uuid.uuid4())
         cursor.execute(
             "INSERT INTO dummy_messages (conv_id, message_id, role, content) VALUES (?, ?, ?, ?)",
             (conv_id, message_id, "user", content[0].text)
@@ -148,7 +149,7 @@ class DummyClient(ClientInterface):
         self.conn.commit()
 
         messages = await self._get_messages(conv_id)
-        response = await self._complete(
+        response_id, response = await self._complete(
             messages + [
                 Message(
                     message_id=message_id,
@@ -160,8 +161,8 @@ class DummyClient(ClientInterface):
 
         cursor.execute(
             "INSERT INTO dummy_messages (conv_id, message_id, role, content) VALUES (?, ?, ?, ?)",
-            (conv_id, str(uuid.uuid4()), "assistant", response[0].text)
+            (conv_id, response_id, "assistant", response[0].text)
         )
 
         self.conn.commit()
-        return True
+        return message_id, response_id
