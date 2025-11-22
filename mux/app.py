@@ -1,14 +1,49 @@
+import asyncio
+from contextlib import asynccontextmanager
 import json
 from time import time
-from fastapi import FastAPI, Response
+import uuid
+from fastapi import FastAPI, Request, Response
 from sqlite3 import connect
 from pydantic import BaseModel
 
 from client_dummy import DummyClient
 from client_interface import ClientInterface, Content
 
+class ProxyCorrelator:
+    def __init__(self):
+        self.current_request_id = None
+        self.lock = asyncio.Lock()
+    
+    @asynccontextmanager
+    async def correlation_context(self, request_id: str):
+        """Ensure only one client call happens at a time"""
+        async with self.lock:
+            self.current_request_id = request_id
+            try:
+                yield
+            finally:
+                self.current_request_id = None
+    
+    def get_current_request_id(self):
+        return self.current_request_id
+
 def db_connect():
     conn = connect('conversations.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE llm_requests (
+            id TEXT PRIMARY KEY,
+            timestamp DATETIME,
+            path TEXT,
+            method TEXT,
+            request_body TEXT,
+            response_status INTEGER,
+            response_body TEXT,
+            duration_ms INTEGER
+        );
+    ''')
+    conn.commit()
     return conn
 
 app = FastAPI()
@@ -53,9 +88,11 @@ class ConvPostRequest(BaseModel):
 @app.post('/api/conv/{conv_id}')
 async def conv_post(conv_id: str, request: ConvPostRequest):
     async with get_client() as client:
-        if not await client.post_user_message(conv_id, request.content):
-            return {"error": "Conversation not found"}, 404
-        conversation, messages = await client.get_messages(conv_id)
+        message_id = str(uuid.uuid4())
+        async with ProxyCorrelator().correlation_context(message_id):
+            if not await client.post_user_message(conv_id, message_id, request.content):
+                return {"error": "Conversation not found"}, 404
+            conversation, messages = await client.get_messages(conv_id)
     return {
         "id": conversation.id,
         "created_at": conversation.created_at,
@@ -66,10 +103,27 @@ async def conv_post(conv_id: str, request: ConvPostRequest):
 
 
 @app.api_route("/proxy/{path:path}", methods=["GET", "POST"])
-async def proxy(path: str):
+async def proxy(request: Request, path: str):
+    body = await request.body()
+    request_id = str(uuid.uuid4())
+
+    with db_connect() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO llm_requests (id, timestamp, path, method, request_body)
+            VALUES (?, ?, ?, ?, ?)
+        """, (
+            request_id,
+            time(),
+            path,
+            "POST",
+            body.decode('utf-8'),
+        ))
+        conn.commit()
+
     # Forward to actual LLM API
     return Response(json.dumps({
-        "id": "chatcmpl-B9MBs8CjcvOU2jLn4n570S5qMJKcT",
+        "id": request_id,
         "object": "chat.completion",
         "created": time(),
         "model": "dummy-model",

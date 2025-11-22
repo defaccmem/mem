@@ -129,13 +129,12 @@ class DummyClient(ClientInterface):
             raise Exception("Unsupported content type in response.")
         return [Content(type="text", text=response.choices[0].message.content)]
 
-    async def post_user_message(self, conv_id: str, content: list[Content]) -> bool:
+    async def post_user_message(self, conv_id: str, message_id: str, content: list[Content]) -> bool:
         if not self.conn:
             raise Exception("Database connection is not established.")
         if len(content) != 1:
             raise Exception("Only single content messages are supported in DummyClient.")
         cursor = self.conn.cursor()
-        message_id = str(uuid.uuid4())
 
         cursor.execute("SELECT conv_id FROM dummy_conversations WHERE conv_id = ?", (conv_id,))
         conv_row = cursor.fetchone()
@@ -146,6 +145,7 @@ class DummyClient(ClientInterface):
             "INSERT INTO dummy_messages (conv_id, message_id, role, content) VALUES (?, ?, ?, ?)",
             (conv_id, message_id, "user", content[0].text)
         )
+        self.conn.commit()
 
         messages = await self._get_messages(conv_id)
         response = await self._complete(
