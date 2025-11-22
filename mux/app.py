@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request, Response
 from sqlite3 import connect
 from pydantic import BaseModel
 
-from client_dummy import DummyClient
+from client_letta import LettaClient
 from client_interface import ClientInterface, Content
 
 class ProxyCorrelator:
@@ -32,7 +32,7 @@ class ProxyCorrelator:
         return self.current_request_id
 
 def db_connect():
-    conn = connect('conversations.db')
+    conn = connect('storage/conversations.db')
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS user_requests (
@@ -62,7 +62,7 @@ app = FastAPI()
 correlator = ProxyCorrelator()
 
 def get_client() -> ClientInterface:
-    return DummyClient()
+    return LettaClient()
 
 @app.get('/api/conv')
 async def conv_list():
@@ -157,12 +157,13 @@ async def conv_post(conv_id: str, request: ConvPostRequest):
 async def llm_request_list():
     with db_connect() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, correlated_conversation_id, correlated_message_id FROM llm_requests")
+        cursor.execute("SELECT llm_requests.id, conv_id, user_message_id, assistant_message_id FROM llm_requests LEFT JOIN user_requests ON llm_requests.correlated_request_id = user_requests.id")
         rows = cursor.fetchall()
         return [{
             "id": row[0],
             "correlated_conversation_id": row[1],
-            "correlated_message_id": row[2]
+            "user_message_id": row[2],
+            "assistant_message_id": row[3]
         } for row in rows], 200
 
 

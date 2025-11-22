@@ -5,6 +5,10 @@ services:
       dockerfile: Dockerfile
     ports:
       - "5000:5000"
+    volumes:
+      - type: bind
+        source: ./storage/mux
+        target: /app/storage
   # dummy_litellm:
   #   image: ghcr.io/berriai/litellm:main-latest
   #   command:
@@ -23,7 +27,11 @@ services:
       dockerfile: Dockerfile
     env_file: .env
     ports:
-     - "8283:8283"
+    - "8283:8283"
+    volumes:
+      - type: bind
+        source: ./storage/letta
+        target: /var/lib/postgresql/data
 configs:
   dummy_litellm_config:
     file: ./dummy_litellm_config.yaml

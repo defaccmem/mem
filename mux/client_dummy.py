@@ -14,7 +14,7 @@ class DummyClient(ClientInterface):
         )
 
     async def __aenter__(self) -> Self:
-        self.conn = connect('conversations.db')
+        self.conn = connect('storage/dummy.db')
         cursor = self.conn.cursor()
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS dummy_conversations (

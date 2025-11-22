@@ -186,5 +186,7 @@ components:
           type: "string"
         conversation_id:
           type: "string"
-        message_id:
+        user_message_id:
+          type: "string"
+        assistant_message_id:
           type: "string"
