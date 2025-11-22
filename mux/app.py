@@ -2,6 +2,7 @@ import asyncio
 from contextlib import asynccontextmanager
 import json
 from time import time
+from typing import Optional
 import uuid
 from fastapi import FastAPI, Request, Response
 from sqlite3 import connect
@@ -12,27 +13,39 @@ from client_interface import ClientInterface, Content
 
 class ProxyCorrelator:
     def __init__(self):
+        self.current_conv_id = None
         self.current_request_id = None
         self.lock = asyncio.Lock()
     
     @asynccontextmanager
-    async def correlation_context(self, request_id: str):
+    async def correlation_context(self, conv_id: str, request_id: str):
         """Ensure only one client call happens at a time"""
         async with self.lock:
+            self.current_conv_id = conv_id
             self.current_request_id = request_id
             try:
                 yield
             finally:
+                self.current_conv_id = None
                 self.current_request_id = None
     
-    def get_current_request_id(self):
+
+    def get_current_conversation_id(self) -> Optional[str]:
+        return self.current_conv_id
+
+    def get_current_request_id(self) -> Optional[str]:
         return self.current_request_id
 
 def db_connect():
     conn = connect('conversations.db')
     cursor = conn.cursor()
     cursor.execute('''
-        CREATE TABLE llm_requests (
+        CREATE TABLE IF NOT EXISTS user_requests (
+            id TEXT PRIMARY KEY
+        );
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS llm_requests (
             id TEXT PRIMARY KEY,
             timestamp DATETIME,
             path TEXT,
@@ -40,13 +53,16 @@ def db_connect():
             request_body TEXT,
             response_status INTEGER,
             response_body TEXT,
-            duration_ms INTEGER
+            duration_ms INTEGER,
+            correlated_conversation_id TEXT,
+            correlated_message_id TEXT
         );
     ''')
     conn.commit()
     return conn
 
 app = FastAPI()
+correlator = ProxyCorrelator()
 
 def get_client() -> ClientInterface:
     return DummyClient()
@@ -71,10 +87,26 @@ async def conv_delete(conv_id: str):
         else:
             return {"error": "Conversation not found"}, 404
 
+def _get_correlated_llm_requests(id_list: list[str]) -> dict[str, str]:
+    query = """SELECT id FROM llm_requests WHERE correlated_message_id = ?"""
+    correlated_requests:dict[str,str] = {}
+    with db_connect() as conn:
+        cursor = conn.cursor()
+        for message_id in id_list:
+            cursor.execute(query, (message_id,))
+            rows = list(cursor.fetchall())
+            if len(rows) == 1:
+                correlated_requests[message_id] = rows[0][0]
+    return correlated_requests
+
+
 @app.get('/api/conv/{conv_id}')
 async def conv_retrieve(conv_id: str):
     async with get_client() as client:
         conversation, messages = await client.get_messages(conv_id)
+        correlated = _get_correlated_llm_requests([m.message_id for m in messages])
+        for message in messages:
+            message.llm_request_id = correlated.get(message.message_id)
     return {
         "id": conversation.id,
         "created_at": conversation.created_at,
@@ -89,7 +121,7 @@ class ConvPostRequest(BaseModel):
 async def conv_post(conv_id: str, request: ConvPostRequest):
     async with get_client() as client:
         message_id = str(uuid.uuid4())
-        async with ProxyCorrelator().correlation_context(message_id):
+        async with correlator.correlation_context(conv_id, message_id):
             if not await client.post_user_message(conv_id, message_id, request.content):
                 return {"error": "Conversation not found"}, 404
             conversation, messages = await client.get_messages(conv_id)
@@ -100,30 +132,43 @@ async def conv_post(conv_id: str, request: ConvPostRequest):
         "messages": messages
     }, 200
 
+@app.get("/api/llm_request")
+async def llm_request_list():
+    with db_connect() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, correlated_conversation_id, correlated_message_id FROM llm_requests")
+        rows = cursor.fetchall()
+        return [{
+            "id": row[0],
+            "correlated_conversation_id": row[1],
+            "correlated_message_id": row[2]
+        } for row in rows], 200
 
 
 @app.api_route("/proxy/{path:path}", methods=["GET", "POST"])
 async def proxy(request: Request, path: str):
     body = await request.body()
-    request_id = str(uuid.uuid4())
+    llm_request_id = str(uuid.uuid4())
 
     with db_connect() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO llm_requests (id, timestamp, path, method, request_body)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO llm_requests (id, timestamp, path, method, request_body, correlated_conversation_id, correlated_message_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
-            request_id,
+            llm_request_id,
             time(),
             path,
             "POST",
             body.decode('utf-8'),
+            correlator.get_current_conversation_id(),
+            correlator.get_current_request_id()
         ))
         conn.commit()
 
     # Forward to actual LLM API
     return Response(json.dumps({
-        "id": request_id,
+        "id": llm_request_id,
         "object": "chat.completion",
         "created": time(),
         "model": "dummy-model",
@@ -132,7 +177,7 @@ async def proxy(request: Request, path: str):
             "index": 0,
             "message": {
                 "role": "assistant",
-                "content": "Hello! How can I assist you today?",
+                "content": "This is a dummy response, not from an actual LLM.",
                 "refusal": None,
                 "annotations": []
             },

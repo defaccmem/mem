@@ -15,6 +15,7 @@ class Message(BaseModel):
     message_id: str
     role: Literal['user', 'assistant', 'system']
     content: list[Content]
+    llm_request_id: Optional[str] = None
 
 class ClientInterface(ABC):
     @abstractmethod

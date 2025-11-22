@@ -96,6 +96,20 @@ paths:
                 $ref: "#/components/schemas/conv"
         404:
           description: "Conversation not found"
+  /api/llm_request:
+    get:
+      operationId: "llm_request_list"
+      description: "List all LLM requests."
+      parameters: []
+      responses:
+        200:
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: "array"
+                items:
+                  $ref: "#/components/schemas/llm_request_list_item"
 components:
   securitySchemes: {}
   schemas:
@@ -165,4 +179,12 @@ components:
             - "text"
         text:
           nullable: true
+          type: "string"
+    llm_request_list_item:
+      properties:
+        id:
+          type: "string"
+        conversation_id:
+          type: "string"
+        message_id:
           type: "string"
