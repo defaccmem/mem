@@ -42,5 +42,5 @@ class ClientInterface(ABC):
         ...
 
     @abstractmethod
-    async def post_user_message(self, conv_id: str, content: list[Content]) -> None:
+    async def post_user_message(self, conv_id: str, content: list[Content]) -> bool:
         ...

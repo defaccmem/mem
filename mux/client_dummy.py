@@ -1,6 +1,6 @@
 from sqlite3 import connect
 from typing import Self
-from client_interface import ClientInterface, Content, Conversation
+from client_interface import ClientInterface, Content, Conversation, Message
 import uuid
 
 class DummyClient(ClientInterface):
@@ -59,7 +59,7 @@ class DummyClient(ClientInterface):
             Conversation(id=row[0], created_at=row[1], topic=row[2]) for row in cursor.fetchall()
         ]
 
-    async def get_messages(self, conv_id: str) -> tuple[Conversation, list]:
+    async def get_messages(self, conv_id: str) -> tuple[Conversation, list[Message]]:
         if not self.conn:
             raise Exception("Database connection is not established.")
         cursor = self.conn.cursor()
@@ -68,28 +68,43 @@ class DummyClient(ClientInterface):
         if not conv_row:
             raise Exception("Conversation not found.")
         conversation = Conversation(id=conv_row[0], created_at=conv_row[1], topic=conv_row[2])
+        messages = await self._get_messages(conv_id)
+        return conversation, messages
         
+    async def _get_messages(self, conv_id: str) -> list[Message]:
+        if not self.conn:
+            raise Exception("Database connection is not established.")
+        cursor = self.conn.cursor()
         cursor.execute("SELECT message_id, role, content FROM dummy_messages WHERE conv_id = ? ORDER BY created_at", (conv_id,))
         messages = [
-            {
-                "message_id": row[0],
-                "role": row[1],
-                "content": [{"type": "text", "text": row[2]}]
-            } for row in cursor.fetchall()
+            Message(
+                message_id=row[0],
+                role=row[1],
+                content=[Content(type="text", text=row[2])]
+            ) for row in cursor.fetchall()
         ]
         
-        return conversation, messages
+        return messages
     
-    async def post_user_message(self, conv_id: str, content: list[Content]) -> None:
+    async def post_user_message(self, conv_id: str, content: list[Content]) -> bool:
         if not self.conn:
             raise Exception("Database connection is not established.")
         if len(content) != 1:
             raise Exception("Only single content messages are supported in DummyClient.")
         cursor = self.conn.cursor()
         message_id = str(uuid.uuid4())
+
+        cursor.execute("SELECT conv_id FROM dummy_conversations WHERE conv_id = ?", (conv_id,))
+        conv_row = cursor.fetchone()
+        if not conv_row:
+            return False
+
+        messages = await self._get_messages(conv_id)
+
         text_content = content[0].text
         cursor.execute(
             "INSERT INTO dummy_messages (conv_id, message_id, role, content) VALUES (?, ?, ?, ?)",
             (conv_id, message_id, "user", text_content)
         )
         self.conn.commit()
+        return True

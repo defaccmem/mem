@@ -3,7 +3,7 @@ from sqlite3 import connect
 from pydantic import BaseModel
 
 from client_dummy import DummyClient
-from client_interface import ClientInterface, Content, Message
+from client_interface import ClientInterface, Content
 
 def db_connect():
     conn = connect('conversations.db')
@@ -51,7 +51,8 @@ class ConvPostRequest(BaseModel):
 @app.post('/api/conv/{conv_id}')
 async def conv_post(conv_id: str, request: ConvPostRequest):
     async with get_client() as client:
-        await client.post_user_message(conv_id, request.content)
+        if not await client.post_user_message(conv_id, request.content):
+            return {"error": "Conversation not found"}, 404
         conversation, messages = await client.get_messages(conv_id)
     return {
         "id": conversation.id,
