@@ -1,4 +1,4 @@
-from flask import Flask
+from fastapi import FastAPI
 from sqlite3 import connect
 import uuid
 
@@ -24,18 +24,18 @@ def db_connect():
     return conn
 
 
-app = Flask(__name__)
+app = FastAPI()
 
-@app.route('/v1/conv', methods=['GET'])
-def list_conversations():
+@app.get('/api/conv')
+async def list_conversations():
     with db_connect() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT conv_id, created_at, topic FROM conversations")
         conversations = [{"id": row[0], "created_at": row[1], "topic": row[2]} for row in cursor.fetchall()]
     return {"conversations": conversations}, 200
 
-@app.route('/v1/conv', methods=['POST'])
-def create_conversation():
+@app.post('/api/conv')
+async def create_conversation():
     conv_id = str(uuid.uuid4())
     with db_connect() as conn:
         cursor = conn.cursor()
@@ -43,8 +43,8 @@ def create_conversation():
         conn.commit()
     return {"id": conv_id}, 201
 
-@app.route('/v1/conv/<conv_id>', methods=['DELETE'])
-def delete_conversation(conv_id):
+@app.delete('/v1/conv/{conv_id}')
+async def delete_conversation(conv_id):
     with db_connect() as conn:
         cursor = conn.cursor()
         response = cursor.execute("DELETE FROM conversations WHERE conv_id = ?", (conv_id,))
@@ -53,5 +53,6 @@ def delete_conversation(conv_id):
             return {"error": "Conversation not found"}, 404
     return {"status": f"Conversation deleted: {conv_id}"}, 200
 
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="localhost", port=5000)

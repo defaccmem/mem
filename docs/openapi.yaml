@@ -6,7 +6,7 @@ info:
 servers:
   - url: "http://localhost:5000"
 paths:
-  /v1/conv:
+  /api/conv:
     get:
       operationId: "conv_list"
       description: "List all conversations."
@@ -36,7 +36,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/conv_create_response"
-  /v1/conv/{conv_id}:
+  /api/conv/{conv_id}:
     delete:
       operationId: "conv_delete"
       description: "Delete a conversation by id."
