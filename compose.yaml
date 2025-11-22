@@ -1,0 +1,13 @@
+services:
+  main:
+    build:
+      context: ./mux
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+  dummy_litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    environment:
+      - LITELLM_MODEL=dummy
+    ports:
+      - "4000:4000"
