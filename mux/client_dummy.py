@@ -32,6 +32,10 @@ class DummyClient(ClientInterface):
                 content TEXT
             )
         ''')
+        cursor.execute('''
+            INSERT OR REPLACE INTO dummy_conversations (conv_id, topic)
+            VALUES ('tc', 'Test Conversation 1')
+        ''')
         self.conn.commit()
         return self
 

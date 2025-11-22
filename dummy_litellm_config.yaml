@@ -1,0 +1,6 @@
+model_list:
+  - model_name: dummy-model
+    litellm_params:
+      model: openai/dummy-model
+      api_base: http://main:5000/proxy/v1
+      api_key: dummy-key

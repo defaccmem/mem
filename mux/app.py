@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+import json
+from time import time
+from fastapi import FastAPI, Response
 from sqlite3 import connect
 from pydantic import BaseModel
 
@@ -60,6 +62,33 @@ async def conv_post(conv_id: str, request: ConvPostRequest):
         "topic": conversation.topic,
         "messages": messages
     }, 200
+
+
+
+@app.api_route("/proxy/{path:path}", methods=["GET", "POST"])
+async def proxy(path: str):
+    # Forward to actual LLM API
+    return Response(json.dumps({
+        "id": "chatcmpl-B9MBs8CjcvOU2jLn4n570S5qMJKcT",
+        "object": "chat.completion",
+        "created": time(),
+        "model": "dummy-model",
+        "choices": [
+            {
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": "Hello! How can I assist you today?",
+                "refusal": None,
+                "annotations": []
+            },
+            "logprobs": None,
+            "finish_reason": "stop"
+            }
+        ],
+        "usage": {},
+        "service_tier": "default"
+    }), 200)
 
 if __name__ == "__main__":
     import uvicorn

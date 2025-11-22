@@ -7,7 +7,16 @@ services:
       - "5000:5000"
   dummy_litellm:
     image: ghcr.io/berriai/litellm:main-latest
+    command:
+      - "--config"
+      - "/app/config.yaml"
+    configs:
+      - source: dummy_litellm_config
+        target: /app/config.yaml
     environment:
       - LITELLM_MODEL=dummy
     ports:
       - "4000:4000"
+configs:
+  dummy_litellm_config:
+    file: ./dummy_litellm_config.yaml
