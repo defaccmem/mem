@@ -1,6 +1,6 @@
 from sqlite3 import connect
 from typing import Self
-from client_interface import ClientInterface, Conversation
+from client_interface import ClientInterface, Content, Conversation
 import uuid
 
 class DummyClient(ClientInterface):
@@ -19,8 +19,9 @@ class DummyClient(ClientInterface):
         ''')
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS dummy_messages (
-                conv_id TEXT PRIMARY KEY,
-                message_id TEXT,
+                message_id TEXT PRIMARY KEY,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                conv_id TEXT,
                 role TEXT,
                 content TEXT
             )
@@ -68,7 +69,7 @@ class DummyClient(ClientInterface):
             raise Exception("Conversation not found.")
         conversation = Conversation(id=conv_row[0], created_at=conv_row[1], topic=conv_row[2])
         
-        cursor.execute("SELECT message_id, role, content FROM dummy_messages WHERE conv_id = ?", (conv_id,))
+        cursor.execute("SELECT message_id, role, content FROM dummy_messages WHERE conv_id = ? ORDER BY created_at", (conv_id,))
         messages = [
             {
                 "message_id": row[0],
@@ -78,3 +79,17 @@ class DummyClient(ClientInterface):
         ]
         
         return conversation, messages
+    
+    async def post_user_message(self, conv_id: str, content: list[Content]) -> None:
+        if not self.conn:
+            raise Exception("Database connection is not established.")
+        if len(content) != 1:
+            raise Exception("Only single content messages are supported in DummyClient.")
+        cursor = self.conn.cursor()
+        message_id = str(uuid.uuid4())
+        text_content = content[0].text
+        cursor.execute(
+            "INSERT INTO dummy_messages (conv_id, message_id, role, content) VALUES (?, ?, ?, ?)",
+            (conv_id, message_id, "user", text_content)
+        )
+        self.conn.commit()

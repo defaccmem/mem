@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 from sqlite3 import connect
+from pydantic import BaseModel
+
 from client_dummy import DummyClient
-from client_interface import ClientInterface
+from client_interface import ClientInterface, Content, Message
 
 def db_connect():
     conn = connect('conversations.db')
@@ -25,7 +27,7 @@ async def conv_create():
     return {"id": conv_id}, 201
 
 @app.delete('/api/conv/{conv_id}')
-async def conv_delete(conv_id):
+async def conv_delete(conv_id: str):
     async with get_client() as client:
         if await client.delete_conversation(conv_id):
             return {"status": f"Conversation deleted: {conv_id}"}, 200
@@ -33,8 +35,23 @@ async def conv_delete(conv_id):
             return {"error": "Conversation not found"}, 404
 
 @app.get('/api/conv/{conv_id}')
-async def conv_retrieve(conv_id):
+async def conv_retrieve(conv_id: str):
     async with get_client() as client:
+        conversation, messages = await client.get_messages(conv_id)
+    return {
+        "id": conversation.id,
+        "created_at": conversation.created_at,
+        "topic": conversation.topic,
+        "messages": messages
+    }, 200
+
+class ConvPostRequest(BaseModel):
+    content: list[Content]
+
+@app.post('/api/conv/{conv_id}')
+async def conv_post(conv_id: str, request: ConvPostRequest):
+    async with get_client() as client:
+        await client.post_user_message(conv_id, request.content)
         conversation, messages = await client.get_messages(conv_id)
     return {
         "id": conversation.id,

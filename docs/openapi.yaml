@@ -73,6 +73,29 @@ paths:
                 $ref: "#/components/schemas/conv"
         404:
           description: "Conversation not found"
+    post:
+      operationId: "conv_post"
+      description: "Post a new user message to the conversation."
+      parameters:
+        - in: "path"
+          name: "conv_id"
+          required: true
+          schema:
+            type: "string"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/conv_post_request"
+      responses:
+        200:
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/conv"
+        404:
+          description: "Conversation not found"
 components:
   securitySchemes: {}
   schemas:
@@ -110,6 +133,13 @@ components:
           type: "array"
           items:
             $ref: "#/components/schemas/message"
+    conv_post_request:
+      properties:
+        content:
+          nullable: false
+          type: "array"
+          items:
+            $ref: "#/components/schemas/content"
     message:
       properties:
         id:

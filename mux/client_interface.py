@@ -40,3 +40,7 @@ class ClientInterface(ABC):
     @abstractmethod
     async def get_messages(self, conv_id: str) -> tuple[Conversation, list[Message]]:
         ...
+
+    @abstractmethod
+    async def post_user_message(self, conv_id: str, content: list[Content]) -> None:
+        ...
