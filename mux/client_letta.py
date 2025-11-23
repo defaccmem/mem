@@ -10,11 +10,9 @@ from letta_client.types.agents.message_create_params import Message as LettaMess
 from client_interface import ClientInterface, Content, Conversation, Message
 
 # MODEL="openai/gpt-4o-mini"
-# MODEL="openai-proxy/dummy-model"
-MODEL="openai/dummy-model"
-# EMBEDDING_MODEL="openai/text-embedding-3-small"
-EMBEDDING_MODEL="openai-proxy/text-embedding-3-small"
-# EMBEDDING_MODEL="openai/dummy-model"
+# MODEL="openai/dummy-model"
+MODEL="lmstudio_openai/dummy-model"
+EMBEDDING_MODEL="openai/text-embedding-3-small"
 
 class LettaClient(ClientInterface):
     def __init__(self):

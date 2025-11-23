@@ -8,10 +8,12 @@ from fastapi import Response
 class DummyOpenAI:
     def handle(self, path: str) -> Response:
         match path:
-            case "v1/chat/completions":
+            case "v1/chat/completions" | "api/v0/chat/completions":
                 return self.create_completion()
-            case "v1/models":
+            case "v1/models" | "api/v0/models":
                 return self.list_models()
+            # case "api/tags":
+            #     return Response(json.dumps([]), 200) 
             case _:
                 return Response(json.dumps({
                     "error": {
@@ -30,14 +32,18 @@ class DummyOpenAI:
                     "id": "dummy-model",
                     "object": "model",
                     "created": 1686935002,
-                    "owned_by": "organization-owner"
-                },
-                {
-                    "id": "text-embedding-3-small",
-                    "object": "model",
-                    "created": 1686935002,
-                    "owned_by": "organization-owner"
+                    "owned_by": "organization-owner",
+                    "type": "llm",  # for compatibility with letta's lmstudio client
+                    "compatibility_type": "gguf", # for compatibility with lmstudio client, I have no idea what this is
                 }
+                # {
+                #     "id": "text-embedding-3-small",
+                #     "object": "model",
+                #     "created": 1686935002,
+                #     "owned_by": "organization-owner",
+                #     "type": "llm",
+                #     "compatibility_type": "gguf", # no idea
+                # }
             ]
         }), 200)
 
