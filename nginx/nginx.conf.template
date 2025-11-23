@@ -1,0 +1,12 @@
+server {
+    listen       4000;
+    server_name  localhost;
+
+    location /api {
+        if ($http_authorization != "Bearer $MEM_API_KEY") {
+            return 401;
+        }
+
+        proxy_pass http://main:5000/api;
+    }
+}

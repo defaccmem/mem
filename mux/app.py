@@ -63,19 +63,6 @@ def db_connect():
 app = FastAPI()
 correlator = ProxyCorrelator()
 
-@app.middleware("http")
-async def check_bearer_token(request: Request, call_next):
-    our_api_key = os.environ['MEM_API_KEY']
-    if request.headers.get("authorization") != f"Bearer {our_api_key}":
-        print(request.headers)
-        return Response(content=json.dumps({
-            "error": {
-                "message": "Invalid API Key",
-                "type": "authentication_error",
-            }
-        }), status_code=401)
-    return await call_next(request)
-
 def get_client() -> ClientInterface:
     return LettaClient()
 

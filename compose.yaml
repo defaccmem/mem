@@ -1,4 +1,11 @@
 services:
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    env_file: .env
+    ports:
+      - "4000:4000"
   main:
     build:
       context: ./mux
@@ -23,7 +30,9 @@ services:
   #   ports:
   #     - "4000:4000"
   letta:
-    image: letta/letta:0.13.0
+    build:
+      context: ./letta
+      dockerfile: Dockerfile
     environment:
       - LMSTUDIO_BASE_URL=http://main:5000/proxy/v1
     env_file: .env
