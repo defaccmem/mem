@@ -140,9 +140,14 @@ async def conv_post(conv_id: str, request: ConvPostRequest):
 
 @app.post('/api/seq/{conv_id}')
 async def seq_post(conv_id: str, request: ConvPostRequest):
+    all_prev_request_ids = await _get_all_llm_request_ids(conv_id)
+    if len(all_prev_request_ids) == 0:
+        initial = None
+    else:
+        initial = all_prev_request_ids[-1]
     request_id = await _do_post(conv_id, request.content)
     llm_request_ids = await _retrieve1(conv_id, request_id)
-    return await _seq_retrieve_llm_request_ids(conv_id, llm_request_ids)
+    return await _seq_retrieve_llm_request_ids(conv_id, llm_request_ids, initial=initial)
 
 async def _do_post(conv_id: str, content: list[Content]):
     request_id = str(uuid.uuid4())
@@ -212,18 +217,20 @@ async def llm_request_retrieve(llm_request_id: str):
 
 @app.get('/api/seq/{conv_id}')
 async def seq_retrieve(conv_id: str):
-    messages = (await _retrieve(conv_id))["messages"]
-    return await _seq_retrieve(conv_id, messages)
+    llm_request_ids = await _get_all_llm_request_ids(conv_id)
+    return await _seq_retrieve_llm_request_ids(conv_id, llm_request_ids)
 
-async def _seq_retrieve(conv_id: str, messages: list[Message]):
+async def _get_all_llm_request_ids(conv_id: str) -> list[str]:
+    messages = (await _retrieve(conv_id))["messages"]
     llm_request_ids = []
     for msg in messages:
         if msg.llm_request_ids is not None:
             llm_request_ids.extend(msg.llm_request_ids)
-    return await _seq_retrieve_llm_request_ids(conv_id, llm_request_ids)
+    return llm_request_ids
 
-async def _seq_retrieve_llm_request_ids(conv_id: str, llm_request_ids: list[str]):
+async def _seq_retrieve_llm_request_ids(conv_id: str, llm_request_ids: list[str], initial: str|None=None):
     sequence:list[tuple[str,str]] = []
+    initial_body:Optional[tuple[str,str]] = None
     with db_connect() as conn:
         cursor = conn.cursor()
         for llm_request_id in llm_request_ids:
@@ -231,7 +238,12 @@ async def _seq_retrieve_llm_request_ids(conv_id: str, llm_request_ids: list[str]
             row = cursor.fetchone()
             if row is not None:
                 sequence.append((row[0], row[1]))
-    return diff_sequence(sequence)
+        if initial is not None:
+            cursor.execute("SELECT request_body, response_body FROM llm_requests WHERE id = ?", (initial,))
+            row = cursor.fetchone()
+            if row is not None:
+                initial_body = (row[0], row[1])
+    return diff_sequence(sequence, initial_body)
 
 @app.api_route("/proxy/{path:path}", methods=["GET", "POST"])
 async def proxy(request: Request, path: str):

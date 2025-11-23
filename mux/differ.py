@@ -142,15 +142,28 @@ class LLMContext:
     def push_response(self, llm_response: list[LLMRequestMessage]) -> list[LLMEvent]:
         self.messages.extend(llm_response)
         return [LLMEvent(type="message", content=str(resp)) for resp in llm_response]
-
-def diff_sequence(sequence: list[tuple[str, str]]) -> list[LLMEvent]:
-    context = LLMContext()
-    events = []
-    for request_body, response_body in sequence:
+    
+    def update_and_push_response(self, request_body: str, response_body: str) -> list[LLMEvent]:
+        events = []
         llm_request_and_response, tools = parse_llm_request(request_body, response_body, "letta")
         tools = json.dumps(json.loads(tools), indent=2)
         llm_request = [msg for msg in llm_request_and_response if msg.part == "request"]
         llm_response = [msg for msg in llm_request_and_response if msg.part == "response"]
-        events.extend(context.update(llm_request, tools))
-        events.extend(context.push_response(llm_response))
+        events.extend(self.update(llm_request, tools))
+        events.extend(self.push_response(llm_response))
+        return events
+
+def diff_sequence(sequence: list[tuple[str, str]], initial: tuple[str,str]|None = None) -> list[LLMEvent]:
+    context = LLMContext()
+    if initial is not None:
+        context.update_and_push_response(initial[0], initial[1])
+    events = []
+    for request_body, response_body in sequence:
+        # llm_request_and_response, tools = parse_llm_request(request_body, response_body, "letta")
+        # tools = json.dumps(json.loads(tools), indent=2)
+        # llm_request = [msg for msg in llm_request_and_response if msg.part == "request"]
+        # llm_response = [msg for msg in llm_request_and_response if msg.part == "response"]
+        # events.extend(context.update(llm_request, tools))
+        # events.extend(context.push_response(llm_response))
+        events.extend(context.update_and_push_response(request_body, response_body))
     return events
