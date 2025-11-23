@@ -31,6 +31,12 @@ class DummyOpenAI:
                     "object": "model",
                     "created": 1686935002,
                     "owned_by": "organization-owner"
+                },
+                {
+                    "id": "text-embedding-3-small",
+                    "object": "model",
+                    "created": 1686935002,
+                    "owned_by": "organization-owner"
                 }
             ]
         }), 200)

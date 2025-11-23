@@ -3,7 +3,7 @@ from typing import Optional, Self
 from client_interface import ClientInterface, Content, Conversation, Message
 import uuid
 from openai import AsyncOpenAI
-from openai.types.chat import ChatCompletionMessageParam, ChatCompletionContentPartParam
+from openai.types.chat import ChatCompletionMessageParam
 
 class DummyClient(ClientInterface):
     def __init__(self):

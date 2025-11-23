@@ -1,5 +1,5 @@
 from typing import Optional, Self, Sequence
-from letta_client import Letta
+from letta_client import AsyncLetta
 from letta_client.types.agents.text_content import TextContent
 from letta_client.types.agents.text_content_param import TextContentParam
 from letta_client.types.agents.image_content import ImageContent
@@ -10,11 +10,15 @@ from letta_client.types.agents.message_create_params import Message as LettaMess
 from client_interface import ClientInterface, Content, Conversation, Message
 
 # MODEL="openai/gpt-4o-mini"
-MODEL="openai-proxy/dummy-model"
+# MODEL="openai-proxy/dummy-model"
+MODEL="openai/dummy-model"
+# EMBEDDING_MODEL="openai/text-embedding-3-small"
+EMBEDDING_MODEL="openai-proxy/text-embedding-3-small"
+# EMBEDDING_MODEL="openai/dummy-model"
 
 class LettaClient(ClientInterface):
     def __init__(self):
-        self.client = Letta(
+        self.client = AsyncLetta(
             base_url="http://letta:8283",
             api_key="dummy-letta-key"
         )
@@ -26,20 +30,20 @@ class LettaClient(ClientInterface):
         pass
 
     async def create_conversation(self) -> str:
-        agent_state = self.client.agents.create(
+        agent_state = await self.client.agents.create(
             model=MODEL,
-            embedding="openai/text-embedding-3-small",
-            memory_blocks=[
-                {
-                    "label": "human",
-                    "value": "The human's name is Chad. They like vibe coding."
-                },
-                {
-                    "label": "persona",
-                    "value": "My name is Sam, a helpful assistant."
-                }
-            ],
-            tools=["web_search", "run_code"]
+            embedding=EMBEDDING_MODEL,
+            # memory_blocks=[
+            #     {
+            #         "label": "human",
+            #         "value": "The human's name is Chad. They like vibe coding."
+            #     },
+            #     {
+            #         "label": "persona",
+            #         "value": "My name is Sam, a helpful assistant."
+            #     }
+            # ],
+            # tools=["web_search", "run_code"]
         )
         return agent_state.id
     
@@ -48,9 +52,9 @@ class LettaClient(ClientInterface):
         return True
 
     async def list_conversations(self) -> list[Conversation]:
-        agents = self.client.agents.list()
+        agents = await self.client.agents.list()
         conversations = []
-        for agent in agents:
+        async for agent in agents:
             conversations.append(
                 Conversation(
                     id=agent.id,
@@ -61,15 +65,15 @@ class LettaClient(ClientInterface):
         return conversations
 
     async def get_messages(self, conv_id: str) -> tuple[Conversation, list[Message]]:
-        agent_state = self.client.agents.retrieve(agent_id=conv_id)
-        messages = self.client.agents.messages.list(agent_id=conv_id)
+        agent_state = await self.client.agents.retrieve(agent_id=conv_id)
+        messages = await self.client.agents.messages.list(agent_id=conv_id)
         conversation = Conversation(
             id=agent_state.id,
             created_at=str(agent_state.created_at),
             topic=agent_state.description or ""
         )
         message_list = []
-        for msg in messages:
+        async for msg in messages:
             match msg.message_type:
                 case "system_message":
                     message_list.append(
@@ -107,7 +111,7 @@ class LettaClient(ClientInterface):
                 "role": "user",
                 "content": letta_content
             }
-        response = self.client.agents.messages.create(
+        response = await self.client.agents.messages.create(
             agent_id=conv_id,
             messages=[letta_message]
         )
@@ -159,3 +163,12 @@ def _translate_content(content: Sequence[TextContent | ImageContent | LettaAssis
 # )
 
 # print(response)
+
+if __name__ == "__main__":
+    import asyncio
+
+    async def main():
+        async with LettaClient() as client:
+            conv_id = await client.create_conversation()
+            print(f"Created conversation: {conv_id}")
+    asyncio.run(main())
