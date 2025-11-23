@@ -70,21 +70,21 @@ def get_client() -> ClientInterface:
 async def conv_list():
     async with get_client() as client:
         conversations = await client.list_conversations()
-    return {"conversations": conversations}, 200
+    return {"conversations": conversations}
 
 @app.post('/api/conv')
 async def conv_create():
     async with get_client() as client:
         conv_id = await client.create_conversation()
-    return {"id": conv_id}, 201
+    return {"id": conv_id}
 
 @app.delete('/api/conv/{conv_id}')
 async def conv_delete(conv_id: str):
     async with get_client() as client:
         if await client.delete_conversation(conv_id):
-            return {"status": f"Conversation deleted: {conv_id}"}, 200
+            return {"status": f"Conversation deleted: {conv_id}"}
         else:
-            return {"error": "Conversation not found"}, 404
+            raise Exception("Conversation not found")
 
 def _get_correlated_llm_requests(message_id_list: list[str]) -> dict[str, str]:
     query = """
@@ -116,7 +116,7 @@ async def _retrieve(conv_id: str):
         "created_at": conversation.created_at,
         "topic": conversation.topic,
         "messages": messages
-    }, 200
+    }
 
 class ConvPostRequest(BaseModel):
     content: list[Content]
@@ -138,7 +138,7 @@ async def conv_post(conv_id: str, request: ConvPostRequest):
         async with get_client() as client:
             resp = await client.post_user_message(conv_id, request.content)
             if resp is None:
-                return {"error": "Conversation not found"}, 404
+                raise Exception("Conversation not found")
             user_message_id, assistant_message_id = resp
             with db_connect() as conn:
                 cursor = conn.cursor()
@@ -166,7 +166,7 @@ async def llm_request_list():
             "correlated_conversation_id": row[1],
             "user_message_id": row[2],
             "assistant_message_id": row[3]
-        } for row in rows], 200
+        } for row in rows]
 
 
 @app.api_route("/proxy/{path:path}", methods=["GET", "POST"])
