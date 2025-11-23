@@ -10,7 +10,12 @@ paths:
     get:
       operationId: "conv_list"
       description: "List all conversations."
-      parameters: []
+      parameters:
+        - in: "header"
+          name: "Authorization"
+          required: true
+          schema:
+            type: "string"
       responses:
         200:
           description: ""
@@ -23,7 +28,12 @@ paths:
     post:
       operationId: "conv_create"
       description: "Start a new, empty conversation."
-      parameters: []
+      parameters:
+        - in: "header"
+          name: "Authorization"
+          required: true
+          schema:
+            type: "string"
       requestBody:
         content:
           application/json:
@@ -41,6 +51,11 @@ paths:
       operationId: "conv_delete"
       description: "Delete a conversation by id."
       parameters:
+        - in: "header"
+          name: "Authorization"
+          required: true
+          schema:
+            type: "string"
         - in: "path"
           name: "conv_id"
           required: true
@@ -59,6 +74,11 @@ paths:
       operationId: "conv_retrieve"
       description: "Retrieve a conversation by id."
       parameters:
+        - in: "header"
+          name: "Authorization"
+          required: true
+          schema:
+            type: "string"
         - in: "path"
           name: "conv_id"
           required: true
@@ -77,6 +97,11 @@ paths:
       operationId: "conv_post"
       description: "Post a new user message to the conversation."
       parameters:
+        - in: "header"
+          name: "Authorization"
+          required: true
+          schema:
+            type: "string"
         - in: "path"
           name: "conv_id"
           required: true
@@ -100,7 +125,12 @@ paths:
     get:
       operationId: "llm_request_list"
       description: "List all LLM requests."
-      parameters: []
+      parameters:
+        - in: "header"
+          name: "Authorization"
+          required: true
+          schema:
+            type: "string"
       responses:
         200:
           description: ""
