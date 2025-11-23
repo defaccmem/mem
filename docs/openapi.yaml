@@ -140,6 +140,30 @@ paths:
                 type: "array"
                 items:
                   $ref: "#/components/schemas/llm_request_list_item"
+  /api/llm_request/{llm_request_id}:
+    get:
+      operationId: "llm_request_retrieve"
+      description: "Retrieve an LLM request by id."
+      parameters:
+        - in: "header"
+          name: "Authorization"
+          required: true
+          schema:
+            type: "string"
+        - in: "path"
+          name: "llm_request_id"
+          required: true
+          schema:
+            type: "string"
+      responses:
+        200:
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/llm_request"
+        404:
+          description: "LLM request not found"
 components:
   securitySchemes: {}
   schemas:
@@ -222,3 +246,62 @@ components:
           type: "string"
         assistant_message_id:
           type: "string"
+    llm_request:
+      properties:
+        id:
+          nullable: false
+          type: "string"
+        conv_id:
+          nullable: false
+          type: "string"
+        messages:
+          nullable: false
+          type: "array"
+          items:
+            $ref: "#/components/schemas/llm_request_message"
+    llm_request_message:
+      properties:
+        id:
+          nullable: true
+          type: "string"
+        role:
+          nullable: false
+          type: "string"
+        content:
+          nullable: false
+          type: "array"
+          items:
+            $ref: "#/components/schemas/content"
+        injected:
+          nullable: false
+          type: "boolean"
+        tool_calls:
+          nullable: true
+          type: "array"
+          items:
+            $ref: "#/components/schemas/tool_call"
+        part:
+          nullable: false
+          type: "string"
+          enum: ["request", "response"]
+    tool_call:
+      properties:
+        id: 
+          nullable: true
+          type: "string"
+        type:
+          nullable: false
+          type: "string"
+          enum:
+            - "function"
+        function:
+          nullable: true
+          $ref: "#/components/schemas/function_call"
+    function_call:
+      properties:
+        name:
+          nullable: false
+          type: "string"
+        arguments:
+          nullable: false
+          type: "object"

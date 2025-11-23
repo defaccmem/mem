@@ -25,6 +25,7 @@ class Client:
         print("/conv del [convid]")
         print("/conv [convid]")
         print("/ls")
+        print("/dig [llm_request_id]")
         print("or just type stuff to add it to the conversation.")
         print()
         print(f"Server: {'local' if self.local else 'cloud'}, Current conversation: {self.current_conv}")
@@ -76,7 +77,7 @@ class Client:
         print(f"Topic: {conv_data['topic']}")
         print("Messages:")
         for msg in conv_data["messages"]:
-            role = "User" if msg["role"] == "user" else "AI"
+            role = msg["role"]
             for content in msg["content"]:
                 assert content["type"] == "text"
                 print(f"{role}: {content['text']}")
@@ -118,6 +119,32 @@ class Client:
                 self.current_conv = ""
         else:
             print("Failed to delete conversation.")
+
+    def dig(self, llm_request_id: str):
+        response = requests.get(f"{self.base_url}/api/llm_request/{llm_request_id}", headers=self.headers)
+        if response.status_code == 200:
+            diff_data = response.json()
+            print(f"LLM Request ID: {llm_request_id}")
+            for msg in diff_data["messages"]:
+                role = msg["role"]
+                injected = "(injected)" if msg["injected"] else ""
+                if len(msg["content"]) == 0:
+                    print(f"{role} {injected}: <no content>")
+                else:
+                    for content in msg["content"]:
+                        assert content["type"] == "text"
+                        print(f"{role} {injected}: {content['text']}")
+                tool_calls = msg.get("tool_calls")
+                if tool_calls is not None and len(tool_calls) > 0:
+                    print("  Tool Calls:")
+                    for tc in tool_calls:
+                        func_name = tc["function"]["name"]
+                        args = tc["function"]["arguments"]
+                        print(f"    - Function: {func_name}, Arguments: {json.dumps(args)}")
+                print("---")
+            print("This was from conversation ID:", diff_data["conv_id"])
+        else:
+            print("Failed to fetch LLM request details.")
 
 
 if __name__ == "__main__":
@@ -163,6 +190,12 @@ if __name__ == "__main__":
                     print(f"Switched to conversation with ID: {client.current_conv}")
             case "/ls":
                 client.print_current_conv()
+            case "/dig":
+                if len(words) != 2:
+                    print("Usage: /dig [llm_request_id]")
+                    continue
+                llm_request_id = words[1]
+                client.dig(llm_request_id)
             case _:
                 if words[0].startswith("/"):
                     print("Unknown command.")

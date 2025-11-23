@@ -5,13 +5,14 @@ import os
 from time import time
 from typing import Optional
 import uuid
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from sqlite3 import connect
 from pydantic import BaseModel
 
 from client_letta import LettaClient
 from client_interface import ClientInterface, Content
 from proxy import ProxyOpenAI
+from differ import diff_llm_request
 
 class ProxyCorrelator:
     def __init__(self):
@@ -168,6 +169,24 @@ async def llm_request_list():
             "assistant_message_id": row[3]
         } for row in rows]
 
+@app.get("/api/llm_request/{llm_request_id}")
+async def llm_request_retrieve(llm_request_id: str):
+    with db_connect() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT llm_requests.request_body, llm_requests.response_body, user_requests.conv_id FROM llm_requests LEFT JOIN user_requests ON llm_requests.correlated_request_id = user_requests.id WHERE llm_requests.id = ?", (llm_request_id,))
+        row = cursor.fetchone()
+        if row is None:
+            raise Exception("LLM Request not found")
+        llm_request_body = row[0]
+        llm_response_body = row[1]
+        conv_id = row[2]
+        visible_parts = await _retrieve(conv_id)
+        diff = diff_llm_request(llm_request_body, llm_response_body, visible_parts["messages"])
+        return {
+            "id": llm_request_id,
+            "conv_id": conv_id,
+            "messages": diff
+        }
 
 @app.api_route("/proxy/{path:path}", methods=["GET", "POST"])
 async def proxy(request: Request, path: str):
@@ -190,7 +209,26 @@ async def proxy(request: Request, path: str):
         conn.commit()
 
     # Forward to actual LLM API
-    return await ProxyOpenAI().handle(request, path.removeprefix("proxy/"))
+    start_time = time()
+    response = await ProxyOpenAI().handle(request, path.removeprefix("proxy/"))
+    response_body = response.body
+    assert isinstance(response_body, bytes)
+    with db_connect() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE llm_requests
+            SET response_status = ?,
+            response_body = ?,
+            duration_ms = ?
+            WHERE id = ?
+        """, (
+            response.status_code,
+            response_body.decode('utf-8'),
+            int((time() - start_time) * 1000),
+            llm_request_id
+        ))
+        conn.commit()
+    return response
 
 if __name__ == "__main__":
     import uvicorn
