@@ -80,6 +80,9 @@ class Client:
             for content in msg["content"]:
                 assert content["type"] == "text"
                 print(f"{role}: {content['text']}")
+                req_ids = msg.get("llm_request_ids", [])
+                if len(req_ids) > 0:
+                    print(f"  (LLM Request IDs: {', '.join(req_ids)})")
             print("---")
 
     def print_current_conv(self):

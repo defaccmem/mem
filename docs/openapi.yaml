@@ -197,9 +197,11 @@ components:
           type: "array"
           items:
             $ref: "#/components/schemas/content"
-        llm_request_id:
+        llm_request_ids:
           nullable: true
-          type: "string"
+          type: "array"
+          items:
+            type: "string"
     content:
       properties:
         type:

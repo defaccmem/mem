@@ -86,18 +86,18 @@ async def conv_delete(conv_id: str):
         else:
             raise Exception("Conversation not found")
 
-def _get_correlated_llm_requests(message_id_list: list[str]) -> dict[str, str]:
+def _get_correlated_llm_requests(message_id_list: list[str]) -> dict[str, list[str]]:
     query = """
         SELECT llm_requests.id FROM llm_requests INNER JOIN user_requests ON llm_requests.correlated_request_id = user_requests.id WHERE user_requests.user_message_id = ? OR user_requests.assistant_message_id = ?
     """
-    correlated_requests:dict[str,str] = {}
+    correlated_requests:dict[str,list[str]] = {}
     with db_connect() as conn:
         cursor = conn.cursor()
         for message_id in message_id_list:
             cursor.execute(query, (message_id, message_id))
             rows = list(cursor.fetchall())
-            if len(rows) == 1:
-                correlated_requests[message_id] = rows[0][0]
+            if len(rows) >= 1:
+                correlated_requests[message_id] = [row[0] for row in rows]
     return correlated_requests
 
 
@@ -110,7 +110,7 @@ async def _retrieve(conv_id: str):
         conversation, messages = await client.get_messages(conv_id)
         correlated = _get_correlated_llm_requests([m.message_id for m in messages])
         for message in messages:
-            message.llm_request_id = correlated.get(message.message_id)
+            message.llm_request_ids = correlated.get(message.message_id, [])
     return {
         "id": conversation.id,
         "created_at": conversation.created_at,
