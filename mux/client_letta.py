@@ -9,6 +9,9 @@ from letta_client.types.agents.message_create_params import Message as LettaMess
 
 from client_interface import ClientInterface, Content, Conversation, Message
 
+# MODEL="openai/gpt-4o-mini"
+MODEL="openai-proxy/dummy-model"
+
 class LettaClient(ClientInterface):
     def __init__(self):
         self.client = Letta(
@@ -24,7 +27,7 @@ class LettaClient(ClientInterface):
 
     async def create_conversation(self) -> str:
         agent_state = self.client.agents.create(
-            model="openai/gpt-4o-mini",
+            model=MODEL,
             embedding="openai/text-embedding-3-small",
             memory_blocks=[
                 {

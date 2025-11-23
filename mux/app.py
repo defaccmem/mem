@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from client_letta import LettaClient
 from client_interface import ClientInterface, Content
+from dummy_openai import DummyOpenAI
 
 class ProxyCorrelator:
     def __init__(self):
@@ -180,7 +181,7 @@ async def proxy(request: Request, path: str):
         """, (
             llm_request_id,
             time(),
-            path,
+            path.removeprefix("proxy/"),
             "POST",
             body.decode('utf-8'),
             correlator.get_current_request_id()
@@ -188,27 +189,7 @@ async def proxy(request: Request, path: str):
         conn.commit()
 
     # Forward to actual LLM API
-    return Response(json.dumps({
-        "id": llm_request_id,
-        "object": "chat.completion",
-        "created": time(),
-        "model": "dummy-model",
-        "choices": [
-            {
-            "index": 0,
-            "message": {
-                "role": "assistant",
-                "content": "This is a dummy response, not from an actual LLM.",
-                "refusal": None,
-                "annotations": []
-            },
-            "logprobs": None,
-            "finish_reason": "stop"
-            }
-        ],
-        "usage": {},
-        "service_tier": "default"
-    }), 200)
+    return DummyOpenAI().handle(path.removeprefix("proxy/"))
 
 if __name__ == "__main__":
     import uvicorn
