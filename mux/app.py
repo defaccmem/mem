@@ -181,11 +181,12 @@ async def llm_request_retrieve(llm_request_id: str):
         llm_response_body = row[1]
         conv_id = row[2]
         visible_parts = await _retrieve(conv_id)
-        diff = diff_llm_request(llm_request_body, llm_response_body, visible_parts["messages"])
+        diff, available_tools = diff_llm_request(llm_request_body, llm_response_body, visible_parts["messages"])
         return {
             "id": llm_request_id,
             "conv_id": conv_id,
-            "messages": diff
+            "messages": diff,
+            "available_tools": available_tools
         }
 
 @app.api_route("/proxy/{path:path}", methods=["GET", "POST"])

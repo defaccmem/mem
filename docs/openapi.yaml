@@ -259,6 +259,9 @@ components:
           type: "array"
           items:
             $ref: "#/components/schemas/llm_request_message"
+        available_tools:
+          nullable: true
+          type: "string"
     llm_request_message:
       properties:
         id:
@@ -271,7 +274,7 @@ components:
           nullable: false
           type: "array"
           items:
-            $ref: "#/components/schemas/content"
+            $ref: "#/components/schemas/llm_request_content"
         injected:
           nullable: false
           type: "boolean"
@@ -284,6 +287,17 @@ components:
           nullable: false
           type: "string"
           enum: ["request", "response"]
+    llm_request_content:
+      properties:
+        type:
+          nullable: false
+          type: "string"
+          enum:
+            - "text"
+            - "thinking"
+        text:
+          nullable: true
+          type: "string"
     tool_call:
       properties:
         id: 

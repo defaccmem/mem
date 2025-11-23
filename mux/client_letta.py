@@ -31,22 +31,22 @@ class LettaClient(ClientInterface):
         agent_state = await self.client.agents.create(
             model=MODEL,
             embedding=EMBEDDING_MODEL,
-            # memory_blocks=[
-            #     {
-            #         "label": "human",
-            #         "value": "The human's name is Chad. They like vibe coding."
-            #     },
-            #     {
-            #         "label": "persona",
-            #         "value": "My name is Sam, a helpful assistant."
-            #     }
-            # ],
+            memory_blocks=[
+                {
+                    "label": "human",
+                    "value": "You know nothing about the human yet."
+                },
+                {
+                    "label": "persona",
+                    "value": "You are a helpful and friendly AI assistant."
+                }
+            ],
             # tools=["web_search", "run_code"]
         )
         return agent_state.id
     
     async def delete_conversation(self, conv_id: str) -> bool:
-        response = self.client.agents.delete(agent_id=conv_id)
+        response = await self.client.agents.delete(agent_id=conv_id)
         return True
 
     async def list_conversations(self) -> list[Conversation]:

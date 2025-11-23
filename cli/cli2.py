@@ -58,7 +58,7 @@ class Client:
             conversations = response.json()["conversations"]
             for conv in conversations:
                 star = "* " if conv["id"] == self.current_conv else "  "
-                print(f"{star}ID: {conv['id']}, Topic: {conv['topic']}")
+                print(f"{star}ID: {conv['id']} Topic: {conv['topic']}")
         else:
             print("Failed to fetch conversations.")
 
@@ -83,7 +83,7 @@ class Client:
                 print(f"{role}: {content['text']}")
                 req_ids = msg.get("llm_request_ids", [])
                 if len(req_ids) > 0:
-                    print(f"  (LLM Request IDs: {', '.join(req_ids)})")
+                    print(f"  (LLM Request IDs: {' '.join(req_ids)})")
             print("---")
 
     def print_current_conv(self):
@@ -125,6 +125,7 @@ class Client:
         if response.status_code == 200:
             diff_data = response.json()
             print(f"LLM Request ID: {llm_request_id}")
+            print(f"Available tools: {diff_data.get('available_tools')}")
             for msg in diff_data["messages"]:
                 role = msg["role"]
                 injected = "(injected)" if msg["injected"] else ""
@@ -132,8 +133,11 @@ class Client:
                     print(f"{role} {injected}: <no content>")
                 else:
                     for content in msg["content"]:
-                        assert content["type"] == "text"
-                        print(f"{role} {injected}: {content['text']}")
+                        match content["type"]:
+                            case "text":
+                                print(f"{role} {injected}: {content['text']}")
+                            case "thinking":
+                                print(f"{role} {injected} (thinking): {content['text']}")
                 tool_calls = msg.get("tool_calls")
                 if tool_calls is not None and len(tool_calls) > 0:
                     print("  Tool Calls:")
