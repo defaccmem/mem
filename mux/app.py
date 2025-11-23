@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from client_letta import LettaClient
 from client_interface import ClientInterface, Content
-from dummy_openai import DummyOpenAI
+from proxy import ProxyOpenAI
 
 class ProxyCorrelator:
     def __init__(self):
@@ -189,7 +189,7 @@ async def proxy(request: Request, path: str):
         conn.commit()
 
     # Forward to actual LLM API
-    return DummyOpenAI().handle(path.removeprefix("proxy/"))
+    return await ProxyOpenAI().handle(request, path.removeprefix("proxy/"))
 
 if __name__ == "__main__":
     import uvicorn

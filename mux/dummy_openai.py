@@ -66,6 +66,20 @@ class DummyOpenAI:
                 "finish_reason": "stop"
                 }
             ],
-            "usage": {},
+            "usage": {
+                "prompt_tokens": 19,
+                "completion_tokens": 10,
+                "total_tokens": 29,
+                "prompt_tokens_details": {
+                "cached_tokens": 0,
+                "audio_tokens": 0
+                },
+                "completion_tokens_details": {
+                "reasoning_tokens": 0,
+                "audio_tokens": 0,
+                "accepted_prediction_tokens": 0,
+                "rejected_prediction_tokens": 0
+                }
+            },
             "service_tier": "default"
         }), 200)

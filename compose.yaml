@@ -25,10 +25,8 @@ services:
   letta:
     image: letta/letta:0.13.0
     environment:
-      - OPENAI_API_KEY=dummy-openai-key
-      # - OPENAI_BASE_URL=http://main:5000/proxy/v1
       - LMSTUDIO_BASE_URL=http://main:5000/proxy/v1
-      - OLLAMA_BASE_URL=http://main:5000/proxy/v1
+    env_file: .env
     ports:
     - "8283:8283"
     volumes:
