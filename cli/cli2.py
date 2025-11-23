@@ -150,6 +150,32 @@ class Client:
         else:
             print("Failed to fetch LLM request details.")
 
+    def seq(self, conv_id: str):
+        response = requests.get(f"{self.base_url}/api/seq/{conv_id}", headers=self.headers)
+        if response.status_code == 200:
+            seq_data = response.json()
+            print(f"Sequence for conversation ID: {conv_id}")
+            for item in seq_data:
+                if item["type"] == "context_change":
+                    for line in item["delta"].splitlines():
+                        content = line[2:]
+                        boring = (
+                            content.startswith("[system] [text] - Memory blocks were last modified: ") or
+                            content.endswith("previous messages between you and the user are stored in recall memory (use tools to access them)") or
+                            content.startswith("[system] [text] - chars_current=") or
+                            content.startswith("[tool] [text]") or
+                            content.strip() == ""
+                        )
+                        if boring:
+                            print(f"  \33[90m{line}\33[0m")
+                        else:
+                            print(f"  \33[33m{line}\33[0m")
+                elif item["type"] == "message":
+                    for line in item["content"].splitlines():
+                        print(f"  {line}")
+        else:
+            print("Failed to fetch sequence data.")
+
 
 if __name__ == "__main__":
     client = Client()
@@ -200,6 +226,8 @@ if __name__ == "__main__":
                     continue
                 llm_request_id = words[1]
                 client.dig(llm_request_id)
+            case "/seq":
+                client.seq(client.current_conv)
             case _:
                 if words[0].startswith("/"):
                     print("Unknown command.")

@@ -1,3 +1,4 @@
+import difflib
 from typing import Literal
 from pydantic import BaseModel
 import json
@@ -24,6 +25,16 @@ class LLMRequestMessage(BaseModel):
     content: list[LLMRequestContent]
     injected: bool
     tool_calls: list[LLMRequestToolCall] | None
+
+    def __str__(self):
+        result = ""
+        for c in self.content:
+            for line in c.text.splitlines():
+                result += f"[{self.role}] [{c.type}] {line}\n"
+        if self.tool_calls is not None:
+            for tc in self.tool_calls:
+                result += f"[{self.role}] [tool_call] {tc.type} {tc.function.name} {tc.function.arguments}\n"
+        return result
 
 def _parse_llm_content(content: list | str | None) -> list[LLMRequestContent]:
     if content is None:
@@ -64,6 +75,7 @@ def _post_process(msg: LLMRequestMessage, source: Literal["letta"]) -> LLMReques
                 if message is not None:
                     new_content.append(LLMRequestContent(type="text", text=message))
                 msg.content = new_content
+                msg.tool_calls = None
     return msg
 
 def parse_llm_request(llm_request_body: str, llm_response_body: str | None, source: Literal["letta"]) -> tuple[list[LLMRequestMessage], str]:
@@ -96,3 +108,49 @@ def diff_llm_request(llm_request_body: str, llm_response_body: str, visible_part
         if all(c.text not in visible_message_texts for c in msg.content):
             msg.injected = True
     return llm_request, available_tools
+
+
+class LLMEvent(BaseModel):
+    type: Literal["message", "context_change"]
+    content: str | None = None
+    delta: str | None = None
+
+class LLMContext:
+    tools: str
+    messages: list[LLMRequestMessage]
+
+    def __init__(self):
+        self.tools = ""
+        self.messages = []
+
+    def update(self, llm_request: list[LLMRequestMessage], available_tools: str) -> list[LLMEvent]:
+        differ = difflib.Differ()
+        events = []
+        if self.tools != available_tools:
+            self.tools = available_tools
+            diff = "\n".join(l for l in differ.compare(self.tools.splitlines(), available_tools.splitlines()) if l.startswith("+ ") or l.startswith("- "))
+            events.append(LLMEvent(type="context_change", delta=diff))
+
+        old_message_str = "\n".join(str(msg) for msg in self.messages)
+        new_message_str = "\n".join(str(msg) for msg in llm_request)
+        diff = "\n".join(l for l in differ.compare(old_message_str.splitlines(), new_message_str.splitlines()) if l.startswith("+ ") or l.startswith("- "))
+        if old_message_str != new_message_str:
+            events.append(LLMEvent(type="context_change", delta=diff))
+        self.messages = llm_request
+        return events
+    
+    def push_response(self, llm_response: list[LLMRequestMessage]) -> list[LLMEvent]:
+        self.messages.extend(llm_response)
+        return [LLMEvent(type="message", content=str(resp)) for resp in llm_response]
+
+def diff_sequence(sequence: list[tuple[str, str]]) -> list[LLMEvent]:
+    context = LLMContext()
+    events = []
+    for request_body, response_body in sequence:
+        llm_request_and_response, tools = parse_llm_request(request_body, response_body, "letta")
+        tools = json.dumps(json.loads(tools), indent=2)
+        llm_request = [msg for msg in llm_request_and_response if msg.part == "request"]
+        llm_response = [msg for msg in llm_request_and_response if msg.part == "response"]
+        events.extend(context.update(llm_request, tools))
+        events.extend(context.push_response(llm_response))
+    return events

@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from client_letta import LettaClient
 from client_interface import ClientInterface, Content
 from proxy import ProxyOpenAI
-from differ import diff_llm_request
+from differ import diff_llm_request, diff_sequence
 
 class ProxyCorrelator:
     def __init__(self):
@@ -188,6 +188,23 @@ async def llm_request_retrieve(llm_request_id: str):
             "messages": diff,
             "available_tools": available_tools
         }
+
+@app.get('/api/seq/{conv_id}')
+async def seq_retrieve(conv_id: str):
+    messages = (await _retrieve(conv_id))["messages"]
+    llm_request_ids = []
+    for msg in messages:
+        if msg.llm_request_ids is not None:
+            llm_request_ids.extend(msg.llm_request_ids)
+    sequence:list[tuple[str,str]] = []
+    with db_connect() as conn:
+        cursor = conn.cursor()
+        for llm_request_id in llm_request_ids:
+            cursor.execute("SELECT request_body, response_body FROM llm_requests WHERE id = ?", (llm_request_id,))
+            row = cursor.fetchone()
+            if row is not None:
+                sequence.append((row[0], row[1]))
+    return diff_sequence(sequence)
 
 @app.api_route("/proxy/{path:path}", methods=["GET", "POST"])
 async def proxy(request: Request, path: str):
