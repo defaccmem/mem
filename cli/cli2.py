@@ -111,6 +111,20 @@ class Client:
         else:
             print("Failed to send message.")
 
+    def seqsay(self, message: str):
+        if not self.current_conv:
+            print("No active conversation. Use /conv [convid/new] to start or switch to a conversation.")
+            return
+        payload = {
+            "content": [{"type": "text", "text": message}]
+        }
+        response = requests.post(f"{self.base_url}/api/seq/{self.current_conv}", headers=self.headers, json=payload)
+        if response.status_code == 200:
+            reply = response.json()
+            self._print_seq(reply)
+        else:
+            print("Failed to send message.")
+
     def delete_conversation(self, conv_id: str):
         response = requests.delete(f"{self.base_url}/api/conv/{conv_id}", headers=self.headers)
         if response.status_code == 200:
@@ -125,56 +139,62 @@ class Client:
         if response.status_code == 200:
             diff_data = response.json()
             print(f"LLM Request ID: {llm_request_id}")
-            print(f"Available tools: {diff_data.get('available_tools')}")
-            for msg in diff_data["messages"]:
-                role = msg["role"]
-                injected = "(injected)" if msg["injected"] else ""
-                if len(msg["content"]) == 0:
-                    print(f"{role} {injected}: <no content>")
-                else:
-                    for content in msg["content"]:
-                        match content["type"]:
-                            case "text":
-                                print(f"{role} {injected}: {content['text']}")
-                            case "thinking":
-                                print(f"{role} {injected} (thinking): {content['text']}")
-                tool_calls = msg.get("tool_calls")
-                if tool_calls is not None and len(tool_calls) > 0:
-                    print("  Tool Calls:")
-                    for tc in tool_calls:
-                        func_name = tc["function"]["name"]
-                        args = tc["function"]["arguments"]
-                        print(f"    - Function: {func_name}, Arguments: {json.dumps(args)}")
-                print("---")
-            print("This was from conversation ID:", diff_data["conv_id"])
+            self._print_dig(diff_data)
         else:
             print("Failed to fetch LLM request details.")
+
+    def _print_dig(self, diff_data: dict):
+        print(f"Available tools: {diff_data.get('available_tools')}")
+        for msg in diff_data["messages"]:
+            role = msg["role"]
+            injected = "(injected)" if msg["injected"] else ""
+            if len(msg["content"]) == 0:
+                print(f"{role} {injected}: <no content>")
+            else:
+                for content in msg["content"]:
+                    match content["type"]:
+                        case "text":
+                            print(f"{role} {injected}: {content['text']}")
+                        case "thinking":
+                            print(f"{role} {injected} (thinking): {content['text']}")
+            tool_calls = msg.get("tool_calls")
+            if tool_calls is not None and len(tool_calls) > 0:
+                print("  Tool Calls:")
+                for tc in tool_calls:
+                    func_name = tc["function"]["name"]
+                    args = tc["function"]["arguments"]
+                    print(f"    - Function: {func_name}, Arguments: {json.dumps(args)}")
+            print("---")
+        print("This was from conversation ID:", diff_data["conv_id"])
 
     def seq(self, conv_id: str):
         response = requests.get(f"{self.base_url}/api/seq/{conv_id}", headers=self.headers)
         if response.status_code == 200:
             seq_data = response.json()
             print(f"Sequence for conversation ID: {conv_id}")
-            for item in seq_data:
-                if item["type"] == "context_change":
-                    for line in item["delta"].splitlines():
-                        content = line[2:]
-                        boring = (
-                            content.startswith("[system] [text] - Memory blocks were last modified: ") or
-                            content.endswith("previous messages between you and the user are stored in recall memory (use tools to access them)") or
-                            content.startswith("[system] [text] - chars_current=") or
-                            content.startswith("[tool] [text]") or
-                            content.strip() == ""
-                        )
-                        if boring:
-                            print(f"  \33[90m{line}\33[0m")
-                        else:
-                            print(f"  \33[33m{line}\33[0m")
-                elif item["type"] == "message":
-                    for line in item["content"].splitlines():
-                        print(f"  {line}")
+            self._print_seq(seq_data)
         else:
             print("Failed to fetch sequence data.")
+
+    def _print_seq(self, seq_data: dict):
+        for item in seq_data:
+            if item["type"] == "context_change":
+                for line in item["delta"].splitlines():
+                    content = line[2:]
+                    boring = (
+                        content.startswith("[system] [text] - Memory blocks were last modified: ") or
+                        content.endswith("previous messages between you and the user are stored in recall memory (use tools to access them)") or
+                        content.startswith("[system] [text] - chars_current=") or
+                        content.startswith("[tool] [text]") or
+                        content.strip() == ""
+                    )
+                    if boring:
+                        print(f"  \33[90m{line}\33[0m")
+                    else:
+                        print(f"  \33[33m{line}\33[0m")
+            elif item["type"] == "message":
+                for line in item["content"].splitlines():
+                    print(f"  {line}")
 
 
 if __name__ == "__main__":
@@ -233,4 +253,4 @@ if __name__ == "__main__":
                     print("Unknown command.")
                     client.print_menu()
                     continue
-                client.say(inp)
+                client.seqsay(inp)

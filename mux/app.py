@@ -10,7 +10,7 @@ from sqlite3 import connect
 from pydantic import BaseModel
 
 from client_letta import LettaClient
-from client_interface import ClientInterface, Content
+from client_interface import ClientInterface, Content, Message
 from proxy import ProxyOpenAI
 from differ import diff_llm_request, diff_sequence
 
@@ -119,11 +119,32 @@ async def _retrieve(conv_id: str):
         "messages": messages
     }
 
+async def _retrieve1(conv_id: str, request_id: str):
+    query = """
+        SELECT id FROM llm_requests WHERE correlated_request_id = ?
+    """
+    correlated_requests:list[str] = []
+    with db_connect() as conn:
+        cursor = conn.cursor()
+        cursor.execute(query, (request_id,))
+        rows = list(cursor.fetchall())
+        return [row[0] for row in rows]
+
 class ConvPostRequest(BaseModel):
     content: list[Content]
 
 @app.post('/api/conv/{conv_id}')
 async def conv_post(conv_id: str, request: ConvPostRequest):
+    await _do_post(conv_id, request.content)
+    return await _retrieve(conv_id)
+
+@app.post('/api/seq/{conv_id}')
+async def seq_post(conv_id: str, request: ConvPostRequest):
+    request_id = await _do_post(conv_id, request.content)
+    llm_request_ids = await _retrieve1(conv_id, request_id)
+    return await _seq_retrieve_llm_request_ids(conv_id, llm_request_ids)
+
+async def _do_post(conv_id: str, content: list[Content]):
     request_id = str(uuid.uuid4())
     with db_connect() as conn:
         cursor = conn.cursor()
@@ -137,7 +158,7 @@ async def conv_post(conv_id: str, request: ConvPostRequest):
         conn.commit()
     async with correlator.correlation_context(request_id):
         async with get_client() as client:
-            resp = await client.post_user_message(conv_id, request.content)
+            resp = await client.post_user_message(conv_id, content)
             if resp is None:
                 raise Exception("Conversation not found")
             user_message_id, assistant_message_id = resp
@@ -154,7 +175,7 @@ async def conv_post(conv_id: str, request: ConvPostRequest):
                     request_id
                 ))
                 conn.commit()
-    return await _retrieve(conv_id)
+    return request_id
 
 @app.get("/api/llm_request")
 async def llm_request_list():
@@ -192,10 +213,16 @@ async def llm_request_retrieve(llm_request_id: str):
 @app.get('/api/seq/{conv_id}')
 async def seq_retrieve(conv_id: str):
     messages = (await _retrieve(conv_id))["messages"]
+    return await _seq_retrieve(conv_id, messages)
+
+async def _seq_retrieve(conv_id: str, messages: list[Message]):
     llm_request_ids = []
     for msg in messages:
         if msg.llm_request_ids is not None:
             llm_request_ids.extend(msg.llm_request_ids)
+    return await _seq_retrieve_llm_request_ids(conv_id, llm_request_ids)
+
+async def _seq_retrieve_llm_request_ids(conv_id: str, llm_request_ids: list[str]):
     sequence:list[tuple[str,str]] = []
     with db_connect() as conn:
         cursor = conn.cursor()

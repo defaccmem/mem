@@ -80,7 +80,7 @@ def _post_process(msg: LLMRequestMessage, source: Literal["letta"]) -> LLMReques
 
 def parse_llm_request(llm_request_body: str, llm_response_body: str | None, source: Literal["letta"]) -> tuple[list[LLMRequestMessage], str]:
     data = json.loads(llm_request_body)
-    print(json.dumps(data, indent=2))
+    # print(json.dumps(data, indent=2))
     result = [LLMRequestMessage(
         part="request",
         message_id=m.get("id"),
