@@ -2,20 +2,10 @@ import requests
 import readline
 import json
 
-def print_menu():
-    print("/server [local/cloud] [apikey]")
-    print("/conv")
-    print("/conv new")
-    print("/conv del [convid]")
-    print("/conv [convid]")
-    print("/ls")
-    print("or just type stuff to add it to the conversation.")
-    print()
-
 class Client:
     def __init__(self):
         self.local = True
-        self.apikey = ""
+        self.apikey = {"local": "", "cloud": ""}
         self.current_conv = ""
         self._read_configuration()
 
@@ -25,7 +15,19 @@ class Client:
     
     @property
     def headers(self):
-        return {"Authorization": f"Bearer {self.apikey}", "Content-Type": "application/json"}
+        apikey = self.apikey["local"] if self.local else self.apikey["cloud"]
+        return {"Authorization": f"Bearer {apikey}", "Content-Type": "application/json"}
+
+    def print_menu(self):
+        print("/server [local/cloud] [apikey]")
+        print("/conv")
+        print("/conv new")
+        print("/conv del [convid]")
+        print("/conv [convid]")
+        print("/ls")
+        print("or just type stuff to add it to the conversation.")
+        print()
+        print(f"Server: {'local' if self.local else 'cloud'}, Current conversation: {self.current_conv}")
     
     def _write_configuration(self):
         with open(".client_config", "w") as f:
@@ -36,10 +38,17 @@ class Client:
             with open(".client_config", "r") as f:
                 config = json.load(f)
                 self.local = config.get("local", True)
-                self.apikey = config.get("apikey", "")
+                self.apikey = config.get("apikey", {"local": "", "cloud": ""})
                 self.current_conv = config.get("current_conv", "")
         except FileNotFoundError:
             pass
+
+    def reconfigure(self, local: bool, apikey: str | None):
+        self.local = local
+        if apikey is not None:
+            self.apikey["local" if local else "cloud"] = apikey
+        self.current_conv = ""
+        self._write_configuration()
 
     def ls_conv(self):
         response = requests.get(f"{self.base_url}/api/conv", headers=self.headers)
@@ -55,7 +64,7 @@ class Client:
     def switch_to_new_conv(self):
         response = requests.post(f"{self.base_url}/api/conv", headers=self.headers, json={})
         response.raise_for_status()
-        if response.status_code == 201:
+        if response.status_code == 200:
             conv = response.json()
             self.current_conv = conv["id"]
             print(f"Switched to new conversation with ID: {self.current_conv}")
@@ -114,7 +123,7 @@ if __name__ == "__main__":
         readline.read_history_file(".history")
     except FileNotFoundError:
         pass
-    print_menu()
+    client.print_menu()
 
     while True:
         inp = input(">> ").strip()
@@ -124,13 +133,11 @@ if __name__ == "__main__":
             continue
         match words[0]:
             case "/server":
-                if len(words) != 3 or words[1] not in ["local", "cloud"]:
+                if len(words) not in [2,3] or words[1] not in ["local", "cloud"]:
                     print("Usage: /server [local/cloud] [apikey]")
                     continue
-                client.local = (words[1] == "local")
-                client.apikey = words[2]
-                client.current_conv = ""
-                client._write_configuration()
+
+                client.reconfigure(words[1] == "local", words[2] if len(words) == 3 else None)
                 print("Configuration updated.")
                 client.ls_conv()
             case "/conv":
@@ -156,5 +163,6 @@ if __name__ == "__main__":
             case _:
                 if words[0].startswith("/"):
                     print("Unknown command.")
+                    client.print_menu()
                     continue
                 client.say(inp)
